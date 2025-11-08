@@ -4,8 +4,7 @@ on:
   push:
     paths:
       - '**/*.pdf'
-    paths-ignore:
-      - '**/*_ocr.pdf'  # Ignore changes to output files to avoid unnecessary triggers
+      - '!**/*_ocr.pdf'  # Negate to exclude changes to output files from triggering
   workflow_dispatch:  # Enables manual "Run workflow" button in Actions tab
 
 jobs:
