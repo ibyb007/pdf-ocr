@@ -1,0 +1,56 @@
+name: OCR PDF
+
+on:
+  push:
+    paths:
+      - '**/*.pdf'
+    paths-ignore:
+      - '**/*_ocr.pdf'  # Ignore changes to output files to avoid unnecessary triggers
+  workflow_dispatch:  # Enables manual "Run workflow" button in Actions tab
+
+jobs:
+  ocr:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check for input PDFs
+      id: check-inputs
+      run: |
+        # Adjust -maxdepth if PDFs are in subdirectories
+        INPUT_COUNT=$(find . -maxdepth 1 -name "*.pdf" ! -name "*_ocr.pdf" | wc -l)
+        if [ "$INPUT_COUNT" -eq 0 ]; then
+          echo "No input PDFs to process (possibly deleted). Skipping OCR."
+          echo "skip=true" >> $GITHUB_OUTPUT
+        else
+          echo "Found $INPUT_COUNT input PDF(s). Proceeding with OCR."
+          echo "skip=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Setup
+      if: steps.check-inputs.outputs.skip != 'true'
+      run: |
+        sudo apt update
+        sudo apt install -y software-properties-common
+        sudo add-apt-repository ppa:alex-p/tesseract-ocr-devel -y
+        sudo apt update
+        sudo apt install tesseract-ocr tesseract-ocr-ben tesseract-ocr-eng poppler-utils
+        pip install -r requirements.txt opencv-python
+
+    - name: Check Tesseract
+      if: steps.check-inputs.outputs.skip != 'true'
+      run: |
+        tesseract --version
+        tesseract --list-langs
+
+    - name: Convert
+      if: steps.check-inputs.outputs.skip != 'true'
+      run: python converter.py  # No arguments: processes all PDFs except output.pdf
+
+    - name: Commit and Push Output
+      if: steps.check-inputs.outputs.skip != 'true'
+      uses: EndBug/add-and-commit@v9
+      with:
+        add: '*_ocr.pdf'  # Add all generated OCR outputs
+        message: 'Add OCR outputs (%Y-%m-%d %H:%M:%S)'
+        default_author: github_actions
